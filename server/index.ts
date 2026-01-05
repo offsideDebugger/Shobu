@@ -3,35 +3,45 @@ import fastifyCors from "@fastify/cors";
 import { auth } from "./utils/auth";
 import matchRoutes from "./routes/matchRoute";
 import fastifyIO from "fastify-socket.io";
+import { createClient } from "redis";
 
-
-
-const app=fastify({
-    logger:true
+const client = await createClient({
+  RESP: 3,
+  clientSideCache: {
+    ttl: 60000, // Time-to-live (0 = no expiration)
+    maxEntries: 0, // Maximum entries (0 = unlimited)
+    evictPolicy: "FIFO", // Eviction policy: "LRU" or "FIFO"
+  },
 })
+  .on("error", (err) => console.log("Redis Client Error", err))
+  .connect();
 
-const PORT=3000
+const listener = (message: string, channel: string) => {
+  console.log(message, channel);
+};
+await client.subscribe("matching", listener);
 
-await app.register(fastifyIO,{
+const app = fastify({
+  logger: true,
+});
+
+const PORT = 3000;
+
+await app.register(fastifyIO, {
   cors: {
-    origin: ["http://localhost:4000"]
-  }
+    origin: ["http://localhost:4000"],
+  },
 });
 
 app.register(fastifyCors, {
   origin: process.env.CLIENT_ORIGIN || "http://localhost:4000",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With"
-  ],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   credentials: true,
-  maxAge: 86400
+  maxAge: 86400,
 });
 
 app.register(matchRoutes);
-
 
 app.route({
   method: ["GET", "POST"],
@@ -40,7 +50,7 @@ app.route({
     try {
       // Construct request URL
       const url = new URL(request.url, `http://${request.headers.host}`);
-      
+
       // Convert Fastify headers to standard Headers object
       const headers = new Headers();
       Object.entries(request.headers).forEach(([key, value]) => {
@@ -58,17 +68,15 @@ app.route({
       reply.status(response.status);
       response.headers.forEach((value, key) => reply.header(key, value));
       reply.send(response.body ? await response.text() : null);
-    } catch (err:any) {
+    } catch (err: any) {
       app.log.error("Authentication Error:", err);
-      reply.status(500).send({ 
+      reply.status(500).send({
         error: "Internal authentication error",
-        code: "AUTH_FAILURE"
+        code: "AUTH_FAILURE",
       });
     }
-  }
+  },
 });
-
-
 
 app.get("/", (req, reply) => {
   if (app.io) {
@@ -90,7 +98,6 @@ app.ready().then(() => {
   });
 });
 
-
-app.listen({port:PORT},()=>{
-    console.log(`server running on port : ${PORT}`)
-})
+app.listen({ port: PORT }, () => {
+  console.log(`server running on port : ${PORT}`);
+});
