@@ -11,7 +11,8 @@
   },
   "scripts": {
     "start": "bun run index.ts",
-    "worker": "bun run services/queueWorker.ts"
+    "workers": "bun run services/queueWorker.ts",
+    "pubsub": "bun run services/subscriberWorker.ts"
   },
   "dependencies": {
     "@better-auth/cli": "^1.4.6",

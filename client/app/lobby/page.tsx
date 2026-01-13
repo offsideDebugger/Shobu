@@ -3,18 +3,34 @@ import { authClient } from "@/utils/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { io } from "socket.io-client";
+import { connectSocket } from "@/utils/socket";
+import type { Socket } from "socket.io-client";
+
 export default function Lobby() {
   const { data: session, isPending } = authClient.useSession();
   const router = useRouter();
   const [response, setResponse] = useState();
-  const IdRef = useRef("");
+  const [userId, setUserId] = useState("");
+  const userSocket = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!isPending && !session?.user?.name) {
       router.push("/login");
     }
   }, [isPending, session?.user?.name, router]);
+
+  useEffect(() => {
+    userSocket.current = connectSocket();
+    userSocket.current.on("connect", () => {
+      console.log("Connected to server with ID:", userSocket.current?.id);
+    });
+
+    return () => {
+      if (userSocket.current) {
+        userSocket.current.disconnect();
+      }
+    }
+  }, []);
 
   if (isPending) {
     return (
@@ -35,21 +51,10 @@ export default function Lobby() {
       },
     });
 
-    const socket = io("http://localhost:3000");
-    socket.on("connect", () => {
-      console.log("connected to socket");
-    });
-    socket.on("disconnect", () => {
-      console.log("disconnected from socket");
-    });
-    socket.on("message", (message) => {
-      console.log(message);
-    });
-
     const response = await matchSearch.data;
     const mesagge = response.message;
     setResponse(mesagge);
-    IdRef.current = response.userId;
+    setUserId(session?.user.id || "");
   }
 
   return (
@@ -66,7 +71,7 @@ export default function Lobby() {
         </button>
       </div>
       <div className="mt-6 text-2xl text-amber-700">{response}</div>
-      <div className="mt-6 text-2xl text-amber-700">{IdRef.current}</div>
+      <div className="mt-6 text-2xl text-amber-700">{userId}</div>
     </div>
   );
 }

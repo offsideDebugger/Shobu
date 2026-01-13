@@ -1,16 +1,8 @@
 import { Worker, Job } from "bullmq";
-import { createClient } from "redis";
 
-const client = await createClient({
-  RESP: 3,
-  clientSideCache: {
-    ttl: 60000, // Time-to-live (0 = no expiration)
-    maxEntries: 0, // Maximum entries (0 = unlimited)
-    evictPolicy: "FIFO", // Eviction policy: "LRU" or "FIFO"
-  },
-})
-  .on("error", (err) => console.log("Redis Client Error", err))
-  .connect();
+import { makeClient } from "../utils/redisClient";
+
+const client = await makeClient();
 
 const connection = {
   host: "127.0.0.1",
@@ -54,22 +46,16 @@ const matches = new Worker(
           await client.del(`matching:${user2}`);
 
           // Match them!
-          await client.publish(
+          await client.PUBLISH(
             "matching",
-            `{
-            matchID:"1234",
-            user1:${user1},
-            user2:${user2}
-            }`,
+            JSON.stringify({
+              matchID: "1234",
+              user1: user1,
+              user2: user2
+            }),
           );
-        } else {
-          // One or both users expired, push back the valid ones
-          if (valid1) {
-            await client.rPush("matching_pool", user1);
-          }
-          if (valid2) {
-            await client.rPush("matching_pool", user2);
-          }
+
+          console.log(`User 1 is ${user1} and User 2 is ${user2}`)
         }
       } else {
         console.log(`Waiting for more users. Current pool size: ${poolSize}`);

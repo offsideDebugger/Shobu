@@ -3,23 +3,7 @@ import fastifyCors from "@fastify/cors";
 import { auth } from "./utils/auth";
 import matchRoutes from "./routes/matchRoute";
 import fastifyIO from "fastify-socket.io";
-import { createClient } from "redis";
 
-const client = await createClient({
-  RESP: 3,
-  clientSideCache: {
-    ttl: 60000, // Time-to-live (0 = no expiration)
-    maxEntries: 0, // Maximum entries (0 = unlimited)
-    evictPolicy: "FIFO", // Eviction policy: "LRU" or "FIFO"
-  },
-})
-  .on("error", (err) => console.log("Redis Client Error", err))
-  .connect();
-
-const listener = (message: string, channel: string) => {
-  console.log(message, channel);
-};
-await client.subscribe("matching", listener);
 
 const app = fastify({
   logger: true,
